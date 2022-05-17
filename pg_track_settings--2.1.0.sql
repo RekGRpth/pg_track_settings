@@ -83,7 +83,7 @@ SELECT pg_catalog.pg_extension_config_dump('@extschema@.pg_reboot', '');
 ----------------------
 -- source functions --
 ----------------------
-CREATE OR REPLACE FUNCTION pg_track_settings_settings_src (
+CREATE OR REPLACE FUNCTION @extschema@.pg_track_settings_settings_src (
     IN _srvid integer,
     OUT ts timestamp with time zone,
     OUT name text,
@@ -104,7 +104,7 @@ BEGIN
 END;
 $PROC$ LANGUAGE plpgsql; /* end of pg_track_settings_settings_src */
 
-CREATE OR REPLACE FUNCTION pg_track_settings_rds_src (
+CREATE OR REPLACE FUNCTION @extschema@.pg_track_settings_rds_src (
     IN _srvid integer,
     OUT ts timestamp with time zone,
     OUT name text,
@@ -128,7 +128,7 @@ BEGIN
 END;
 $PROC$ LANGUAGE plpgsql; /* end of pg_track_settings_rds_src */
 
-CREATE OR REPLACE FUNCTION pg_track_settings_reboot_src (
+CREATE OR REPLACE FUNCTION @extschema@.pg_track_settings_reboot_src (
     IN _srvid integer,
     OUT ts timestamp with time zone,
     OUT postmaster_ts timestamp with time zone
@@ -149,7 +149,7 @@ $PROC$ LANGUAGE plpgsql; /* end of pg_track_settings_reboot_src */
 ------------------------
 -- snapshot functions --
 ------------------------
-CREATE OR REPLACE FUNCTION pg_track_settings_snapshot_settings(_srvid integer)
+CREATE OR REPLACE FUNCTION @extschema@.pg_track_settings_snapshot_settings(_srvid integer)
     RETURNS boolean AS
 $_$
 DECLARE
@@ -205,11 +205,11 @@ BEGIN
         SELECT srvid, name, setting
         FROM (
             SELECT srvid, name, setting,
-              row_number() OVER (PARTITION BY NAME ORDER BY ts DESC) AS rownum
+              row_number() OVER (PARTITION BY NAME ORDER BY ts DESC) AS rn
             FROM @extschema@.pg_track_settings_history h
             WHERE h.srvid = _srvid
         ) all_snapshots
-        WHERE rownum = 1
+        WHERE all_snapshots.rn = 1
     )
     INSERT INTO @extschema@.pg_track_settings_history
       (srvid, ts, name, setting, setting_pretty)
@@ -231,7 +231,7 @@ END;
 $_$
 LANGUAGE plpgsql; /* end of pg_track_settings_snapshot_settings() */
 
-CREATE OR REPLACE FUNCTION pg_track_settings_snapshot_rds(_srvid integer)
+CREATE OR REPLACE FUNCTION @extschema@.pg_track_settings_snapshot_rds(_srvid integer)
     RETURNS boolean AS
 $_$
 DECLARE
@@ -303,11 +303,11 @@ BEGIN
         SELECT setdatabase, setrole, name, setting
         FROM (
             SELECT setdatabase, setrole, name, setting,
-                row_number() OVER (PARTITION BY name, setdatabase, setrole ORDER BY ts DESC) AS rownum
+                row_number() OVER (PARTITION BY name, setdatabase, setrole ORDER BY ts DESC) AS rn
             FROM @extschema@.pg_track_db_role_settings_history
             WHERE srvid = _srvid
         ) all_snapshots
-        WHERE rownum = 1
+        WHERE all_snapshots.rn = 1
     )
     INSERT INTO @extschema@.pg_track_db_role_settings_history
         (srvid, ts, setdatabase, setrole, name, setting)
@@ -362,7 +362,7 @@ LANGUAGE plpgsql; /* end of pg_track_settings_snapshot_reboot() */
 
 -- global function doing all the work for local instance, kept for backward
 -- compatibility
-CREATE OR REPLACE FUNCTION pg_track_settings_snapshot()
+CREATE OR REPLACE FUNCTION @extschema@.pg_track_settings_snapshot()
 RETURNS boolean AS
 $_$
 BEGIN
@@ -386,12 +386,12 @@ BEGIN
         SELECT s.name, s.setting, s.setting_pretty
         FROM (
             SELECT h.name, h.setting, h.setting_pretty, h.is_dropped,
-            row_number() OVER (PARTITION BY h.name ORDER BY h.ts DESC) AS rownum
+            row_number() OVER (PARTITION BY h.name ORDER BY h.ts DESC) AS rn
             FROM @extschema@.pg_track_settings_history h
             WHERE h.srvid = _srvid
             AND h.ts <= _ts
         ) s
-        WHERE s.rownum = 1
+        WHERE s.rn = 1
         AND NOT s.is_dropped
         ORDER BY s.name;
 END;
@@ -408,12 +408,12 @@ BEGIN
         SELECT s.setdatabase, s.setrole, s.name, s.setting
         FROM (
             SELECT h.setdatabase, h.setrole, h.name, h.setting, h.is_dropped,
-                row_number() OVER (PARTITION BY h.name, h.setdatabase, h.setrole ORDER BY h.ts DESC) AS rownum
+                row_number() OVER (PARTITION BY h.name, h.setdatabase, h.setrole ORDER BY h.ts DESC) AS rn
             FROM @extschema@.pg_track_db_role_settings_history h
             WHERE h.srvid = _srvid
             AND h.ts <= _ts
         ) s
-        WHERE s.rownum = 1
+        WHERE s.rn = 1
         AND NOT s.is_dropped
         ORDER BY s.setdatabase, s.setrole, s.name;
 END;
@@ -476,7 +476,7 @@ END;
 $_$
 LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION pg_track_settings_log(
+CREATE OR REPLACE FUNCTION @extschema@.pg_track_settings_log(
     _name text,
     _srvid integer DEFAULT 0)
 RETURNS TABLE (ts timestamp with time zone, name text, setting_exists boolean,
@@ -493,7 +493,7 @@ END;
 $_$
 LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION pg_track_db_role_settings_log(
+CREATE OR REPLACE FUNCTION @extschema@.pg_track_db_role_settings_log(
     _name text,
     _srvid integer DEFAULT 0)
 RETURNS TABLE (ts timestamp with time zone, setdatabase oid, setrole oid,
@@ -510,7 +510,7 @@ END;
 $_$
 LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION pg_track_reboot_log(_srvid integer DEFAULT 0)
+CREATE OR REPLACE FUNCTION @extschema@.pg_track_reboot_log(_srvid integer DEFAULT 0)
 RETURNS TABLE (ts timestamp with time zone) AS
 $_$
 BEGIN
